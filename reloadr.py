@@ -1,22 +1,20 @@
 """Reloadr - Python library for hot code reloading
-(c) 2015-2017 Hugo Herter
+(c) 2015-2019 Hugo Herter
 """
-
-from os.path import dirname, abspath
 import inspect
 import logging
 import redbaron
-from baron.parser import ParsingError
 import threading
 import types
-from time import sleep
 import weakref
-
+from baron.parser import ParsingError
+from os.path import dirname, abspath
+from time import sleep
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 __author__ = "Hugo Herter"
-__version__ = '0.3.3'
+__version__ = '0.3.4'
 
 
 def get_new_source(target, kind, filepath=None):
@@ -57,30 +55,30 @@ def reload_target(target, kind, filepath=None):
 
 
 def reload_class(target):
-    "Get the new class object corresponding to the target class."
+    """Get the new class object corresponding to the target class."""
     return reload_target(target, 'class')
 
 
 def reload_function(target, filepath: str):
-    "Get the new function object corresponding to the target function."
+    """Get the new function object corresponding to the target function."""
     return reload_target(target, 'def', filepath)
 
 
 class GenericReloadr:
 
     def _timer_reload(self, interval=1):
-        "Reload the target every `interval` seconds."
+        """Reload the target every `interval` seconds."""
         while True:
             self._reload()
             sleep(interval)
 
     def _start_timer_reload(self, interval=1):
-        "Start a thread that reloads the target every `interval` seconds."
+        """Start a thread that reloads the target every `interval` seconds."""
         thread = threading.Thread(target=self._timer_reload)
         thread.start()
 
     def _start_watch_reload(self, original):
-        "Reload the target based on file changes in the directory"
+        """Reload the target based on file changes in the directory"""
         if not original:  # Prevent multiple watchers
             return
 
@@ -106,18 +104,18 @@ class ClassReloadr(GenericReloadr):
         self._instances = []  # For classes, keep a reference to all instances
 
     def __call__(self, *args, **kwargs):
-        "Override instantiation in order to register a reference to the instance"
+        """Override instantiation in order to register a reference to the instance"""
         instance = self._target.__call__(*args, **kwargs)
         # Register a reference to the instance
         self._instances.append(weakref.ref(instance))
         return instance
 
     def __getattr__(self, name):
-        "Proxy inspection to the target"
+        """Proxy inspection to the target"""
         return self._target.__getattr__(name)
 
     def _reload(self):
-        "Manually reload the class with its new code."
+        """Manually reload the class with its new code."""
         try:
             self._target = reload_class(self._target)
             # Replace the class reference of all instances with the new class
@@ -138,23 +136,24 @@ class FuncReloadr(GenericReloadr):
         self._filepath = inspect.getsourcefile(target)
 
     def __call__(self, *args, **kwargs):
-        "Proxy function call to the target"
+        """Proxy function call to the target"""
         return self._target.__call__(*args, **kwargs)
 
     def __getattr__(self, name):
-        "Proxy inspection to the target"
+        """Proxy inspection to the target"""
         return self._target.__getattr__(name)
 
     def _reload(self):
-        "Manually reload the function with its new code."
+        """Manually reload the function with its new code."""
         try:
             self._target = reload_function(self._target, self._filepath)
+            logging.info('Reloaded {}'.format(self._target.__name__))
         except ParsingError as error:
             logging.error('Parsing error: {}'.format(error))
 
 
 def reloadr(target):
-    "Main decorator, forwards the target to the appropriate class."
+    """Main decorator, forwards the target to the appropriate class."""
     if isinstance(target, types.FunctionType):
         return FuncReloadr(target)
     else:
@@ -162,7 +161,7 @@ def reloadr(target):
 
 
 def autoreload(target, original=True):
-    "Decorator that immediately starts watching the source file in a thread."
+    """Decorator that immediately starts watching the source file in a thread."""
     def execute(target):
         result = reloadr(target)
         result._start_watch_reload(original)
@@ -173,5 +172,4 @@ def autoreload(target, original=True):
     else:
         def wrapper(target):
             return execute(target)
-
         return wrapper
