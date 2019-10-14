@@ -4,6 +4,7 @@
 
 from os.path import dirname, abspath
 import inspect
+import logging
 import redbaron
 from baron.parser import ParsingError
 import threading
@@ -124,8 +125,9 @@ class ClassReloadr(GenericReloadr):
                 instance = ref()  # We keep weak references to objects
                 if instance:
                     instance.__class__ = self._target
+            logging.info('Reloaded {}'.format(self._target.__name__))
         except ParsingError as error:
-            print('ParsingError', error)
+            logging.error('Parsing error: {}'.format(error))
 
 
 class FuncReloadr(GenericReloadr):
@@ -148,7 +150,7 @@ class FuncReloadr(GenericReloadr):
         try:
             self._target = reload_function(self._target, self._filepath)
         except ParsingError as error:
-            print('ParsingError', error)
+            logging.error('Parsing error: {}'.format(error))
 
 
 def reloadr(target):
