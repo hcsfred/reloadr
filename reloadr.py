@@ -86,10 +86,9 @@ class GenericReloadr:
 
         class EventHandler(FileSystemEventHandler):
             def on_modified(self, event):
-                this._reload()
+                if not event.is_directory and event.src_path == filepath:
+                    this._reload()
 
-        # Sadly, watchdog only operates on directories and not on a file
-        # level, so any change within the directory will trigger a reload.
         observer.schedule(EventHandler(), filedir, recursive=False)
         observer.start()
 
