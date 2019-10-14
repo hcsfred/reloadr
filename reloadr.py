@@ -43,6 +43,8 @@ def reload_target(target, kind, filepath=None):
     assert kind in ('class', 'def')
 
     source = get_new_source(target, kind, filepath)
+    decorator = '@autoreload'
+    source = source.replace(decorator, '{}(original=False)'.format(decorator))
     module = inspect.getmodule(target)
     # We will populate these locals using exec()
     locals_ = {}
@@ -76,12 +78,14 @@ class GenericReloadr:
         thread = threading.Thread(target=self._timer_reload)
         thread.start()
 
-    def _start_watch_reload(self):
+    def _start_watch_reload(self, original):
         "Reload the target based on file changes in the directory"
+        if not original:  # Prevent multiple watchers
+            return
+
         observer = Observer()
         filepath = inspect.getsourcefile(self._target)
         filedir = dirname(abspath(filepath))
-
         this = self
 
         class EventHandler(FileSystemEventHandler):
@@ -155,8 +159,17 @@ def reloadr(target):
         return ClassReloadr(target)
 
 
-def autoreload(target):
+def autoreload(target, original=True):
     "Decorator that immediately starts watching the source file in a thread."
-    result = reloadr(target)
-    result._start_watch_reload()
-    return result
+    def execute(target):
+        result = reloadr(target)
+        result._start_watch_reload(original)
+        return result
+
+    if target:
+        return execute(target)
+    else:
+        def wrapper(target):
+            return execute(target)
+
+        return wrapper
