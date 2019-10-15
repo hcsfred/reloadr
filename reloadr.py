@@ -42,16 +42,13 @@ def reload_target(target, kind, filepath=None):
     assert kind in ('class', 'def')
 
     source = get_new_source(target, kind, filepath)
-    decorator = '@autoreload'
-    source = source.replace(decorator, '{}(original=False)'.format(decorator))
+    source = source.replace('@{}'.format(autoreload.__name__), '')  # Remove decorator
     module = inspect.getmodule(target)
     # We will populate these locals using exec()
     locals_ = {}
     # module.__dict__ is the namespace of the module
     exec(source, module.__dict__, locals_)
-    # The result is expected to be decorated with @reloadr, so we return
-    # ._target, which corresponds to the class itself and not the Reloadr class
-    return locals_[target.__name__]._target
+    return locals_[target.__name__]
 
 
 def reload_class(target):
@@ -77,11 +74,8 @@ class GenericReloadr:
         thread = threading.Thread(target=self._timer_reload)
         thread.start()
 
-    def _start_watch_reload(self, original):
+    def _start_watch_reload(self):
         """Reload the target based on file changes in the directory"""
-        if not original:  # Prevent multiple watchers
-            return
-
         observer = Observer()
         filepath = inspect.getsourcefile(self._target)
         filedir = dirname(abspath(filepath))
@@ -160,16 +154,8 @@ def reloadr(target):
         return ClassReloadr(target)
 
 
-def autoreload(target, original=True):
+def autoreload(target=None):
     """Decorator that immediately starts watching the source file in a thread."""
-    def execute(target):
-        result = reloadr(target)
-        result._start_watch_reload(original)
-        return result
-
-    if target:
-        return execute(target)
-    else:
-        def wrapper(target):
-            return execute(target)
-        return wrapper
+    result = reloadr(target)
+    result._start_watch_reload()
+    return result
